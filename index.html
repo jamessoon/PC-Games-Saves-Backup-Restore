@@ -163,11 +163,11 @@
                     if (type === 'source') {
                         setSource(handle);
                         await saveHandle('source', handle);
-                        setStatus('Save Path Linked.');
+                        setStatus('Savefiles Location Linked.');
                     } else {
                         setBackup(handle);
                         await saveHandle('backup', handle);
-                        setStatus('Vault Path Linked.');
+                        setStatus('Backup Location Linked.');
                         refresh(handle);
                     }
                 } catch (e) { if (e.name !== 'AbortError') setStatus(`Error: ${e.message}`); }
@@ -192,7 +192,7 @@
             const doRestore = async () => {
                 const targetFolder = backupsList.find(b => b.name === selected);
                 if (!source || !targetFolder) return;
-                if (!confirm("CRITICAL: This will DELETE all current files in the Save Path. Proceed?")) return;
+                if (!confirm("CRITICAL: This will DELETE all current files in the Savefiles Location. Proceed?")) return;
                 setLoading(true);
                 setStatus('Purging local files...');
                 try {
@@ -213,8 +213,8 @@
                                 <Icons.Shield />
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold italic uppercase">SaveVault<span className="text-indigo-400">.io</span></h1>
-                                <p className="text-slate-400 font-medium text-xs tracking-widest uppercase">Safe & Portable Engine</p>
+                                <h1 className="text-3xl font-bold italic uppercase">PC Games<span className="text-indigo-400"> Saves</span></h1>
+                                <p className="text-slate-400 font-medium text-xs tracking-widest uppercase">Backup and Restore</p>
                             </div>
                         </div>
                         <div className="flex items-center space-x-3 bg-slate-900/50 px-5 py-2.5 rounded-full border border-slate-700/50">
@@ -224,28 +224,28 @@
                     </header>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <PathCard title="Save Path" subtitle="Source Directory" handle={source} onPick={() => pick('source')} icon={<Icons.Folder />} color="indigo" />
-                        <PathCard title="Vault Path" subtitle="Backup Destination" handle={backup} onPick={() => pick('backup')} icon={<Icons.CloudDown />} color="emerald" />
+                        <PathCard title="Savefiles Location" subtitle="Source Directory" handle={source} onPick={() => pick('source')} icon={<Icons.Folder />} color="indigo" />
+                        <PathCard title="Backup Location" subtitle="Backup Destination" handle={backup} onPick={() => pick('backup')} icon={<Icons.CloudDown />} color="emerald" />
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
                         <div className="lg:col-span-3 glass p-8 rounded-3xl space-y-6">
-                            <h2 className="text-xl font-bold flex items-center"><Icons.CloudUp /> <span className="ml-3">New Snapshot</span></h2>
+                            <h2 className="text-xl font-bold flex items-center"><Icons.CloudUp /> <span className="ml-3">New Backup</span></h2>
                             <div className="space-y-4">
-                                <input type="text" placeholder="Optional Label" value={customName} onChange={e => setCustomName(e.target.value)} className="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                                <input type="text" placeholder="Input Backup Name (Default: Backup_DateTime)" value={customName} onChange={e => setCustomName(e.target.value)} className="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-indigo-500/50" />
                                 <button onClick={doBackup} disabled={!source || !backup || loading} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold py-5 rounded-2xl transition-all shadow-lg flex items-center justify-center">
                                     <Icons.CloudUp /> <span className="ml-3">INITIALIZE BACKUP</span>
                                 </button>
                             </div>
                         </div>
                         <div className="lg:col-span-2 glass p-8 rounded-3xl flex flex-col space-y-6">
-                            <h2 className="text-xl font-bold flex items-center"><Icons.Refresh /> <span className="ml-3">Restore Point</span></h2>
+                            <h2 className="text-xl font-bold flex items-center"><Icons.Refresh /> <span className="ml-3">Restore Backup</span></h2>
                             <div className="flex-1 space-y-4">
                                 <select value={selected} onChange={e => setSelected(e.target.value)} className="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 outline-none text-white font-medium cursor-pointer">
-                                    {backupsList.length === 0 ? <option value="">Empty Vault</option> : backupsList.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+                                    {backupsList.length === 0 ? <option value="">No Backup Found</option> : backupsList.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
                                 </select>
                                 <button onClick={doRestore} disabled={!source || !selected || loading} className="w-full border-2 border-emerald-500/30 hover:bg-emerald-600 hover:border-transparent text-emerald-500 hover:text-white font-bold py-5 rounded-2xl transition-all">
-                                    RUN RECOVERY
+                                    RESTORE
                                 </button>
                             </div>
                         </div>
