@@ -1,0 +1,5 @@
+{
+  "name": "PC Games Saves - Backup / Restore",
+  "description": "A robust file backup and restoration utility using the Web File System Access API. Manage save paths, create timestamped backups, and restore files with ease.",
+  "requestFramePermissions": []
+}
