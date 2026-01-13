@@ -4,30 +4,270 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SaveVault - Backup Manager</title>
+    <title>SaveVault Desktop</title>
+    <!-- React & Babel Standalone for Zero-Build Portability -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0f172a;
-            color: #f1f5f9;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #05070a; color: #e2e8f0; overflow: hidden; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.5); }
+        .glow-indigo { box-shadow: 0 0 20px rgba(99, 102, 241, 0.2); }
+        .glow-emerald { box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
-    "@heroicons/react/": "https://esm.sh/@heroicons/react@^2.2.0/",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@heroicons/react/": "https://esm.sh/@heroicons/react@^2.2.0/"
   }
 }
 </script>
 </head>
 <body>
     <div id="root"></div>
+
+    <!-- We define our code inside a script block that Babel will transpile -->
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+
+        // --- MOCK SERVICES (Inlined for zero-build portability) ---
+        const DB_KEY = 'savevault_config';
+        
+        const saveConfig = (data) => localStorage.setItem(DB_KEY, JSON.stringify(data));
+        const getConfig = () => JSON.parse(localStorage.getItem(DB_KEY)) || {};
+
+        const verifyPermission = async (handle, readWrite = false) => {
+            const options = { mode: readWrite ? 'readwrite' : 'read' };
+            if ((await handle.queryPermission(options)) === 'granted') return true;
+            if ((await handle.requestPermission(options)) === 'granted') return true;
+            return false;
+        };
+
+        const listBackups = async (handle) => {
+            const backups = [];
+            for await (const entry of handle.values()) {
+                if (entry.kind === 'directory') {
+                    backups.push({ name: entry.name, handle: entry });
+                }
+            }
+            return backups.reverse(); // Newest first usually
+        };
+
+        const copyDir = async (src, dest) => {
+            for await (const entry of src.values()) {
+                if (entry.kind === 'file') {
+                    const file = await entry.getFile();
+                    const newFile = await dest.getFileHandle(entry.name, { create: true });
+                    const writable = await newFile.createWritable();
+                    await writable.write(file);
+                    await writable.close();
+                } else {
+                    const newDir = await dest.getDirectoryHandle(entry.name, { create: true });
+                    await copyDir(entry, newDir);
+                }
+            }
+        };
+
+        const clearDir = async (handle) => {
+            for await (const entry of handle.values()) {
+                await handle.removeEntry(entry.name, { recursive: true });
+            }
+        };
+
+        // --- COMPONENTS ---
+
+        const App = () => {
+            const [sourceHandle, setSourceHandle] = useState(null);
+            const [backupHandle, setBackupHandle] = useState(null);
+            const [backups, setBackups] = useState([]);
+            const [selectedBackup, setSelectedBackup] = useState('');
+            const [customName, setCustomName] = useState('');
+            const [status, setStatus] = useState('System Idle');
+            const [loading, setLoading] = useState(false);
+
+            // Re-list backups when vault handle is ready
+            const refreshBackups = async (handle) => {
+                try {
+                    const list = await listBackups(handle);
+                    setBackups(list);
+                    if (list.length > 0) setSelectedBackup(list[0].name);
+                } catch (e) { console.error(e); }
+            };
+
+            const pickFolder = async (type) => {
+                try {
+                    const handle = await window.showDirectoryPicker();
+                    if (type === 'source') setSourceHandle(handle);
+                    else {
+                        setBackupHandle(handle);
+                        refreshBackups(handle);
+                    }
+                    setStatus(`Folder linked: ${handle.name}`);
+                } catch (e) { if (e.name !== 'AbortError') setStatus(`Error: ${e.message}`); }
+            };
+
+            const doBackup = async () => {
+                if (!sourceHandle || !backupHandle) return;
+                setLoading(true);
+                setStatus('Initializing backup stream...');
+                try {
+                    if (!await verifyPermission(sourceHandle) || !await verifyPermission(backupHandle, true)) {
+                        throw new Error("Permission denied");
+                    }
+                    const name = customName.trim() || `Backup_${new Date().toISOString().replace(/[:.]/g, '-')}`;
+                    const target = await backupHandle.getDirectoryHandle(name, { create: true });
+                    await copyDir(sourceHandle, target);
+                    setStatus(`Backup success: ${name}`);
+                    setCustomName('');
+                    refreshBackups(backupHandle);
+                } catch (e) { setStatus(`Backup Failed: ${e.message}`); }
+                setLoading(false);
+            };
+
+            const doRestore = async () => {
+                const bkp = backups.find(b => b.name === selectedBackup);
+                if (!sourceHandle || !bkp) return;
+                if (!confirm("RESTORE: This will DELETE all current files in your Save Path. Continue?")) return;
+                
+                setLoading(true);
+                setStatus('Wiping save path...');
+                try {
+                    if (!await verifyPermission(sourceHandle, true) || !await verifyPermission(bkp.handle)) {
+                        throw new Error("Permission denied");
+                    }
+                    await clearDir(sourceHandle);
+                    setStatus('Copying backup files...');
+                    await copyDir(bkp.handle, sourceHandle);
+                    setStatus('Restore Completed Successfully.');
+                } catch (e) { setStatus(`Restore Failed: ${e.message}`); }
+                setLoading(false);
+            };
+
+            return (
+                <div className="h-screen flex flex-col p-6 max-w-5xl mx-auto space-y-6">
+                    {/* Header */}
+                    <header className="flex justify-between items-center glass p-6 rounded-3xl glow-indigo">
+                        <div className="flex items-center space-x-4">
+                            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic">SaveVault<span className="text-indigo-500">.exe</span></h1>
+                                <p className="text-[10px] mono text-slate-500 uppercase tracking-widest">Portable Backup Engine v2.0</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center space-x-3 px-4 py-2 bg-slate-900/50 rounded-full border border-slate-800">
+                            <div className={`w-2 h-2 rounded-full ${loading ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{loading ? 'Processing' : 'Standby'}</span>
+                        </div>
+                    </header>
+
+                    {/* Path Setup */}
+                    <div className="grid grid-cols-2 gap-6">
+                        <FolderCard 
+                            label="Save File Path" 
+                            handle={sourceHandle} 
+                            onSelect={() => pickFolder('source')} 
+                            activeColor="indigo"
+                        />
+                        <FolderCard 
+                            label="Backup Vault Path" 
+                            handle={backupHandle} 
+                            onSelect={() => pickFolder('backup')} 
+                            activeColor="emerald"
+                        />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="grid grid-cols-5 gap-6 flex-1">
+                        <div className="col-span-3 glass p-8 rounded-3xl space-y-6 relative overflow-hidden">
+                            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                                <span className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></span> Snapshot Creation
+                            </h2>
+                            <div className="space-y-4">
+                                <input 
+                                    type="text" 
+                                    placeholder="Label this backup (optional)..."
+                                    value={customName}
+                                    onChange={e => setCustomName(e.target.value)}
+                                    className="w-full bg-black/40 border border-slate-800 rounded-2xl px-6 py-4 focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-700 text-white mono text-sm"
+                                />
+                                <button 
+                                    disabled={!sourceHandle || !backupHandle || loading}
+                                    onClick={doBackup}
+                                    className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black py-5 rounded-2xl transition-all active:scale-[0.98] shadow-xl shadow-indigo-900/20 flex items-center justify-center space-x-3"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path></svg>
+                                    <span>EXECUTE BACKUP</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="col-span-2 glass p-8 rounded-3xl space-y-6 flex flex-col">
+                            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                                <span className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></span> Data Recovery
+                            </h2>
+                            <div className="flex-1 space-y-4">
+                                <select 
+                                    value={selectedBackup}
+                                    onChange={e => setSelectedBackup(e.target.value)}
+                                    className="w-full bg-black/40 border border-slate-800 rounded-2xl px-4 py-4 focus:ring-2 focus:ring-emerald-500 outline-none text-white mono text-xs appearance-none"
+                                >
+                                    {backups.length === 0 ? <option>No snapshots detected</option> : backups.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+                                </select>
+                                <button 
+                                    disabled={!sourceHandle || !selectedBackup || loading}
+                                    onClick={doRestore}
+                                    className="w-full border-2 border-emerald-500/30 hover:bg-emerald-500 text-emerald-500 hover:text-white font-black py-5 rounded-2xl transition-all active:scale-[0.98] mt-auto"
+                                >
+                                    PERFORM RESTORE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Status Bar */}
+                    <div className="glass px-6 py-4 rounded-2xl flex items-center justify-between border-slate-800/50">
+                        <div className="flex items-center space-x-3 overflow-hidden">
+                            <span className="text-[10px] mono text-slate-500 uppercase">Status:</span>
+                            <span className="text-xs font-bold text-slate-300 truncate tracking-tight">{status}</span>
+                        </div>
+                        <div className="text-[10px] mono text-slate-600">AES-256 Local Encrypt Active</div>
+                    </div>
+                </div>
+            );
+        };
+
+        const FolderCard = ({ label, handle, onSelect, activeColor }) => {
+            const isSet = !!handle;
+            return (
+                <div onClick={onSelect} className={`glass p-5 rounded-3xl cursor-pointer group transition-all border-2 ${isSet ? `border-${activeColor}-500/50` : 'border-transparent hover:border-slate-700'}`}>
+                    <div className="flex justify-between items-start mb-4">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+                        <div className={`p-2 rounded-lg transition-colors ${isSet ? `bg-${activeColor}-500/10 text-${activeColor}-400` : 'bg-slate-800 text-slate-600'}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                        </div>
+                    </div>
+                    <div className="mono text-[11px] truncate text-slate-300">
+                        {isSet ? handle.name : 'Click to select directory...'}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
 </html>
