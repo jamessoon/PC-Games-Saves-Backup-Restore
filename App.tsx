@@ -12,14 +12,14 @@ import {
   LockClosedIcon,
   ArrowRightIcon
 } from '@heroicons/react/24/outline';
-import { getHandle, saveHandle } from './services/dbService';
+import { getHandle, saveHandle } from './services/dbService.ts';
 import { 
   copyDirectory, 
   clearDirectory, 
   listBackups, 
   verifyPermission 
-} from './services/fileService';
-import { AppState, PathType } from './types';
+} from './services/fileService.ts';
+import { AppState, PathType } from './types.ts';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -34,7 +34,6 @@ const App: React.FC = () => {
   const [selectedBackup, setSelectedBackup] = useState<string>('');
   const [apiSupported, setApiSupported] = useState(true);
 
-  // Initialize and load saved directory handles
   useEffect(() => {
     setApiSupported('showDirectoryPicker' in window);
 
@@ -150,15 +149,12 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] text-slate-200 selection:bg-indigo-500/30">
-      {/* Background Decor */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-600/10 blur-[120px] rounded-full"></div>
       </div>
 
       <div className="relative max-w-5xl mx-auto px-4 py-12 md:px-8 space-y-8">
-        
-        {/* API Check */}
         {!apiSupported && (
           <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center text-red-400">
             <ExclamationCircleIcon className="w-6 h-6 mr-3 shrink-0" />
@@ -166,7 +162,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-center gap-6 bg-slate-800/40 backdrop-blur-md p-8 rounded-3xl border border-slate-700/50 shadow-2xl">
           <div className="flex items-center space-x-5">
             <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 p-4 rounded-2xl shadow-lg shadow-indigo-500/20">
@@ -185,7 +180,6 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        {/* Path Configuration */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <PathCard 
             title="Save File Path" 
@@ -205,18 +199,12 @@ const App: React.FC = () => {
           />
         </section>
 
-        {/* Action Panel */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          
-          {/* Create Backup */}
           <div className="lg:col-span-3 bg-slate-800/40 backdrop-blur-md p-8 rounded-3xl border border-slate-700/50 shadow-xl space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white flex items-center">
-                <CloudArrowUpIcon className="w-6 h-6 mr-3 text-indigo-400" />
-                Snapshot Manager
-              </h2>
-            </div>
-            
+            <h2 className="text-xl font-bold text-white flex items-center">
+              <CloudArrowUpIcon className="w-6 h-6 mr-3 text-indigo-400" />
+              Snapshot Manager
+            </h2>
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-400 ml-1">Optional Snapshot Label</label>
@@ -228,7 +216,6 @@ const App: React.FC = () => {
                   className="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-indigo-500/50 focus:outline-none transition-all placeholder:text-slate-600 text-white"
                 />
               </div>
-
               <button
                 onClick={handleBackup}
                 disabled={!state.sourcePath || !state.backupPath || state.isLoading}
@@ -242,41 +229,32 @@ const App: React.FC = () => {
                   )}
                   CREATE NEW BACKUP
                 </div>
-                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </button>
             </div>
           </div>
 
-          {/* Restore Backup */}
           <div className="lg:col-span-2 bg-slate-800/40 backdrop-blur-md p-8 rounded-3xl border border-slate-700/50 shadow-xl flex flex-col space-y-6">
             <h2 className="text-xl font-bold text-white flex items-center">
               <ArrowPathIcon className="w-6 h-6 mr-3 text-emerald-400" />
               Restore Point
             </h2>
-            
             <div className="flex-1 space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-400 ml-1">Available Backups</label>
-                <div className="relative">
-                  <select 
-                    value={selectedBackup}
-                    onChange={(e) => setSelectedBackup(e.target.value)}
-                    className="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-emerald-500/50 focus:outline-none appearance-none text-white font-medium cursor-pointer"
-                  >
-                    {state.backups.length === 0 ? (
-                      <option value="">No backups found in vault</option>
-                    ) : (
-                      state.backups.map(b => (
-                        <option key={b.name} value={b.name}>{b.name}</option>
-                      ))
-                    )}
-                  </select>
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-                    <ArrowPathIcon className="w-5 h-5" />
-                  </div>
-                </div>
+                <select 
+                  value={selectedBackup}
+                  onChange={(e) => setSelectedBackup(e.target.value)}
+                  className="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-emerald-500/50 focus:outline-none text-white font-medium cursor-pointer"
+                >
+                  {state.backups.length === 0 ? (
+                    <option value="">No backups found</option>
+                  ) : (
+                    state.backups.map(b => (
+                      <option key={b.name} value={b.name}>{b.name}</option>
+                    ))
+                  )}
+                </select>
               </div>
-
               <button
                 onClick={handleRestore}
                 disabled={!state.sourcePath || !state.backupPath || !selectedBackup || state.isLoading}
@@ -288,41 +266,32 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Status Bar */}
         <div className={`flex items-center p-5 rounded-2xl border transition-all duration-300 ${
           state.statusMessage.toLowerCase().includes('failed') || state.statusMessage.toLowerCase().includes('error') ? 'bg-red-500/10 border-red-500/30 text-red-400' :
           state.statusMessage.toLowerCase().includes('success') ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
           'bg-slate-800/40 border-slate-700/50 text-slate-400'
         }`}>
-          {state.statusMessage.toLowerCase().includes('failed') ? (
-            <ExclamationCircleIcon className="w-6 h-6 mr-3 shrink-0" />
-          ) : state.statusMessage.toLowerCase().includes('success') ? (
-            <CheckCircleIcon className="w-6 h-6 mr-3 shrink-0" />
-          ) : (
-            <InformationCircleIcon className="w-6 h-6 mr-3 shrink-0" />
-          )}
+          <InformationCircleIcon className="w-6 h-6 mr-3 shrink-0" />
           <span className="text-sm font-semibold">{state.statusMessage}</span>
         </div>
 
-        {/* Security Info */}
         <footer className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8">
           <div className="bg-slate-800/20 p-6 rounded-2xl border border-slate-800/50 space-y-3">
             <LockClosedIcon className="w-6 h-6 text-indigo-400" />
-            <h4 className="text-white font-bold text-sm">Sandboxed Security</h4>
-            <p className="text-xs text-slate-500 leading-relaxed">Browsers only allow access to folders you explicitly select. We cannot see your files unless you grant permission.</p>
+            <h4 className="text-white font-bold text-sm">Sandboxed</h4>
+            <p className="text-xs text-slate-500 leading-relaxed">Browsers isolate this app. We only have access to the specific folders you pick.</p>
           </div>
           <div className="bg-slate-800/20 p-6 rounded-2xl border border-slate-800/50 space-y-3">
             <ShieldCheckIcon className="w-6 h-6 text-emerald-400" />
-            <h4 className="text-white font-bold text-sm">Local Processing</h4>
-            <p className="text-xs text-slate-500 leading-relaxed">All file copying happens directly on your machine. Your data is never uploaded or sent to any server.</p>
+            <h4 className="text-white font-bold text-sm">100% Private</h4>
+            <p className="text-xs text-slate-500 leading-relaxed">No data is ever uploaded. All operations happen locally on your hard drive.</p>
           </div>
           <div className="bg-slate-800/20 p-6 rounded-2xl border border-slate-800/50 space-y-3">
             <ArrowRightIcon className="w-6 h-6 text-slate-400" />
-            <h4 className="text-white font-bold text-sm">Re-Authorization</h4>
-            <p className="text-xs text-slate-500 leading-relaxed">Browsers revoke file access when you close the tab. You will be prompted to re-grant permission when you return.</p>
+            <h4 className="text-white font-bold text-sm">Hosting Tip</h4>
+            <p className="text-xs text-slate-500 leading-relaxed">Hosting on GitHub? Make sure to use HTTPS. File APIs require a secure connection.</p>
           </div>
         </footer>
-
       </div>
     </div>
   );
@@ -340,7 +309,7 @@ interface PathCardProps {
 const PathCard: React.FC<PathCardProps> = ({ title, subtitle, handle, onPick, icon, color }) => {
   const colorClass = color === 'indigo' ? 'text-indigo-400 bg-indigo-500/10' : 'text-emerald-400 bg-emerald-500/10';
   const borderClass = color === 'indigo' ? 'border-indigo-500/20' : 'border-emerald-500/20';
-  const hoverClass = color === 'indigo' ? 'hover:bg-indigo-500 text-white' : 'hover:bg-emerald-600 text-white';
+  const hoverClass = color === 'indigo' ? 'hover:bg-indigo-500' : 'hover:bg-emerald-600';
 
   return (
     <div className="bg-slate-800/40 backdrop-blur-md p-6 rounded-3xl border border-slate-700/50 shadow-lg flex flex-col justify-between h-full group transition-all hover:border-slate-600">
@@ -349,11 +318,7 @@ const PathCard: React.FC<PathCardProps> = ({ title, subtitle, handle, onPick, ic
           <div className={`p-3 rounded-xl ${colorClass}`}>
             {icon}
           </div>
-          {handle && (
-            <div className="flex items-center bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">
-              Linked
-            </div>
-          )}
+          {handle && <div className="text-emerald-400 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-tighter bg-emerald-500/10">Linked</div>}
         </div>
         <div>
           <h3 className="text-lg font-bold text-white">{title}</h3>
@@ -365,10 +330,9 @@ const PathCard: React.FC<PathCardProps> = ({ title, subtitle, handle, onPick, ic
           </span>
         </div>
       </div>
-      
       <button 
         onClick={onPick}
-        className={`mt-6 w-full py-3.5 rounded-xl text-xs font-bold transition-all border border-slate-700 ${hoverClass} flex items-center justify-center space-x-2`}
+        className={`mt-6 w-full py-3.5 rounded-xl text-xs font-bold transition-all border border-slate-700 ${hoverClass} hover:text-white flex items-center justify-center space-x-2`}
       >
         <span>{handle ? 'CHANGE FOLDER' : 'SELECT FOLDER'}</span>
         <ArrowRightIcon className="w-4 h-4" />
